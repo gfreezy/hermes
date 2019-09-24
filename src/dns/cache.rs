@@ -329,9 +329,7 @@ mod tests {
         let mut cache = Cache::new();
 
         // Verify that no data is returned when nothing is present
-        if cache.lookup("www.google.com", QueryType::A).is_some() {
-            panic!()
-        }
+        assert!(cache.lookup("www.google.com", QueryType::A).is_none());
 
         // Register a negative cache entry
         cache.store_nxdomain("www.google.com", QueryType::A, 3600);
