@@ -99,7 +99,6 @@ pub mod tests {
             dns_port: 53,
             resolve_strategy: ResolveStrategy::Recursive,
             allow_recursive: true,
-            enable_udp: true,
             statistics: ServerStatistics {
                 tcp_query_count: AtomicUsize::new(0),
                 udp_query_count: AtomicUsize::new(0),
