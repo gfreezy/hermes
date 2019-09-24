@@ -1,7 +1,5 @@
 //! hermes documentation
-
-pub mod dns;
-
+#![allow(clippy::unreadable_literal)]
 use async_std::task;
 use std::env;
 use std::net::Ipv4Addr;
@@ -9,9 +7,7 @@ use std::sync::Arc;
 
 use getopts::Options;
 
-use crate::dns::context::{ResolveStrategy, ServerContext};
-use crate::dns::protocol::{DnsRecord, TransientTtl};
-use crate::dns::server::DnsUdpServer;
+use hermes::{DnsRecord, DnsUdpServer, ResolveStrategy, ServerContext, TransientTtl};
 
 fn print_usage(program: &str, opts: Options) {
     let brief = format!("Usage: {} [options]", program);

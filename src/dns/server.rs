@@ -40,12 +40,12 @@ macro_rules! ignore_or_report {
 fn resolve_cnames<'a>(
     lookup_list: &'a [DnsRecord],
     results: &'a mut Vec<DnsPacket>,
-    resolver: &'a mut Box<dyn DnsResolver>,
+    resolver: &'a mut dyn DnsResolver,
     depth: u16,
 ) -> BoxFuture<'a, ()> {
     async move {
         if depth > 10 {
-            return ();
+            return;
         }
         for rec in lookup_list {
             match rec {
@@ -104,7 +104,7 @@ pub async fn execute_query(context: Arc<ServerContext>, request: &DnsPacket) -> 
                 let unmatched = result.get_unresolved_cnames();
                 results.push(result);
 
-                resolve_cnames(&unmatched, &mut results, &mut resolver, 0);
+                resolve_cnames(&unmatched, &mut results, resolver.as_mut(), 0);
 
                 rescode
             }
@@ -155,9 +155,11 @@ impl DnsUdpServer {
     /// being called multiple times.
     pub async fn run_server(self) {
         // Bind the socket
-        let socket = Arc::new(UdpSocket::bind(("0.0.0.0", self.context.dns_port))
-            .await
-            .unwrap());
+        let socket = Arc::new(
+            UdpSocket::bind(("0.0.0.0", self.context.dns_port))
+                .await
+                .unwrap(),
+        );
 
         loop {
             let _ = self

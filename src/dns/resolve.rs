@@ -99,7 +99,7 @@ pub struct RecursiveDnsResolver {
 
 impl RecursiveDnsResolver {
     pub fn new(context: Arc<ServerContext>) -> RecursiveDnsResolver {
-        RecursiveDnsResolver { context: context }
+        RecursiveDnsResolver { context }
     }
 }
 
@@ -116,7 +116,7 @@ impl DnsResolver for RecursiveDnsResolver {
         let mut tentative_ns = None;
 
         let labels = qname.split('.').collect::<Vec<&str>>();
-        for lbl_idx in 0..labels.len() + 1 {
+        for lbl_idx in 0..=labels.len() {
             let domain = labels[lbl_idx..].join(".");
 
             match self

@@ -138,8 +138,8 @@ impl DnsClient for DnsNetworkClient {
 #[cfg(test)]
 pub mod tests {
 
-    use std::io::Result;
     use async_std::task::block_on;
+    use std::io::Result;
 
     use super::*;
     use crate::dns::protocol::{DnsPacket, DnsRecord, QueryType};
@@ -152,7 +152,7 @@ pub mod tests {
 
     impl<'a> DnsStubClient {
         pub fn new(callback: Box<StubCallback>) -> DnsStubClient {
-            DnsStubClient { callback: callback }
+            DnsStubClient { callback }
         }
     }
 
@@ -183,22 +183,22 @@ pub mod tests {
     #[test]
     pub fn test_udp_client() {
         block_on(async {
-        let client = DnsNetworkClient::new(31456).await;
+            let client = DnsNetworkClient::new(31456).await;
 
-        let res = client
-            .send_udp_query("google.com", QueryType::A, ("8.8.8.8", 53), true).await
-            .unwrap();
+            let res = client
+                .send_udp_query("google.com", QueryType::A, ("8.8.8.8", 53), true)
+                .await
+                .unwrap();
 
-        assert_eq!(res.questions[0].name, "google.com");
-        assert!(res.answers.len() > 0);
+            assert_eq!(res.questions[0].name, "google.com");
+            assert!(res.answers.len() > 0);
 
-        match res.answers[0] {
-            DnsRecord::A { ref domain, .. } => {
-                assert_eq!("google.com", domain);
+            match res.answers[0] {
+                DnsRecord::A { ref domain, .. } => {
+                    assert_eq!("google.com", domain);
+                }
+                _ => panic!(),
             }
-            _ => panic!(),
-        }
         });
     }
-
 }

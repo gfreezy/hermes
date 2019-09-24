@@ -61,7 +61,7 @@ pub struct DomainEntry {
 impl DomainEntry {
     pub fn new(domain: String) -> DomainEntry {
         DomainEntry {
-            domain: domain,
+            domain,
             record_types: HashMap::new(),
             hits: 0,
             updates: 0,
@@ -72,8 +72,8 @@ impl DomainEntry {
         self.updates += 1;
 
         let new_set = RecordSet::NoRecords {
-            qtype: qtype,
-            ttl: ttl,
+            qtype,
+            ttl,
             timestamp: Local::now(),
         };
 
@@ -105,7 +105,7 @@ impl DomainEntry {
 
         let new_set = RecordSet::Records {
             qtype: rec.get_querytype(),
-            records: records,
+            records,
         };
 
         self.record_types.insert(rec.get_querytype(), new_set);
