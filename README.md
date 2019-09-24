@@ -33,23 +33,12 @@ This is the result of running `hermes -h`
         -f, --forward SERVER
                             forward replies to specified dns server
 
-API endpoints
--------------
-
-By default, the API will run on port 5380.
-
-All endpoints can return either JSON or HTML. When POST'ing, you can do so with
-either form data or json objects.
-
-The following endpoints are available:
-
- * /cache - List the current cache entries along with statistics
- * /authority - List current authoritative zones
- * /authority/[zone] - List the records within a zone
-
-Contact
+Changes From Original Repo
 -------
+1. Use async/await with `async-std` and `async-trait`
+2. Remove dns over tcp
 
-Comments and pull requests are welcome and encouraged.
-
-Author: Emil Hernvall <emil@c0la.se>
+Thanks
+-------
+Originated from https://github.com/EmilHernvall/hermes.
+Thanks to Emil Hernvall <emil@c0la.se>

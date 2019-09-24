@@ -160,14 +160,6 @@ impl VectorPacketBuffer {
 }
 
 impl PacketBuffer for VectorPacketBuffer {
-    fn find_label(&self, label: &str) -> Option<usize> {
-        self.label_lookup.get(label).cloned()
-    }
-
-    fn save_label(&mut self, label: &str, pos: usize) {
-        self.label_lookup.insert(label.to_string(), pos);
-    }
-
     fn read(&mut self) -> Result<u8> {
         let res = self.buffer[self.pos];
         self.pos += 1;
@@ -211,6 +203,14 @@ impl PacketBuffer for VectorPacketBuffer {
 
         Ok(())
     }
+
+    fn find_label(&self, label: &str) -> Option<usize> {
+        self.label_lookup.get(label).cloned()
+    }
+
+    fn save_label(&mut self, label: &str, pos: usize) {
+        self.label_lookup.insert(label.to_string(), pos);
+    }
 }
 
 pub struct StreamPacketBuffer<'a, T>
@@ -239,14 +239,6 @@ impl<'a, T> PacketBuffer for StreamPacketBuffer<'a, T>
 where
     T: Read + 'a,
 {
-    fn find_label(&self, _: &str) -> Option<usize> {
-        None
-    }
-
-    fn save_label(&mut self, _: &str, _: usize) {
-        unimplemented!();
-    }
-
     fn read(&mut self) -> Result<u8> {
         while self.pos >= self.buffer.len() {
             let mut local_buffer = [0; 1];
@@ -301,6 +293,14 @@ where
         self.pos += steps;
         Ok(())
     }
+
+    fn find_label(&self, _: &str) -> Option<usize> {
+        None
+    }
+
+    fn save_label(&mut self, _: &str, _: usize) {
+        unimplemented!();
+    }
 }
 
 pub struct BytePacketBuffer {
@@ -324,12 +324,6 @@ impl Default for BytePacketBuffer {
 }
 
 impl PacketBuffer for BytePacketBuffer {
-    fn find_label(&self, _: &str) -> Option<usize> {
-        None
-    }
-
-    fn save_label(&mut self, _: &str, _: usize) {}
-
     fn read(&mut self) -> Result<u8> {
         if self.pos >= 512 {
             return Err(Error::new(ErrorKind::InvalidInput, "End of buffer"));
@@ -384,6 +378,12 @@ impl PacketBuffer for BytePacketBuffer {
 
         Ok(())
     }
+
+    fn find_label(&self, _: &str) -> Option<usize> {
+        None
+    }
+
+    fn save_label(&mut self, _: &str, _: usize) {}
 }
 
 #[cfg(test)]

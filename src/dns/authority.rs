@@ -1,13 +1,12 @@
 //! contains the data store for local zones
 
-use std::collections::{BTreeMap, BTreeSet};
-use std::fs::File;
-use std::io::{Error, ErrorKind, Result, Write};
-use std::path::Path;
-use std::sync::{LockResult, RwLock, RwLockReadGuard, RwLockWriteGuard};
-
 use crate::dns::buffer::{PacketBuffer, StreamPacketBuffer, VectorPacketBuffer};
 use crate::dns::protocol::{DnsPacket, DnsRecord, QueryType, ResultCode, TransientTtl};
+use async_std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::collections::{BTreeMap, BTreeSet};
+use std::fs::File;
+use std::io::{Result, Write};
+use std::path::Path;
 
 #[derive(Clone, Debug, Default)]
 pub struct Zone {
@@ -161,22 +160,13 @@ impl Authority {
         }
     }
 
-    pub fn load(&self) -> Result<()> {
-        let mut zones = match self.zones.write() {
-            Ok(x) => x,
-            Err(_) => return Err(Error::new(ErrorKind::Other, "Failed to acquire lock")),
-        };
-
-        zones.load()?;
-
-        Ok(())
+    pub async fn load(&self) -> Result<()> {
+        let mut zones = self.zones.write().await;
+        zones.load()
     }
 
-    pub fn query(&self, qname: &str, qtype: QueryType) -> Option<DnsPacket> {
-        let zones = match self.zones.read().ok() {
-            Some(x) => x,
-            None => return None,
-        };
+    pub async fn query(&self, qname: &str, qtype: QueryType) -> Option<DnsPacket> {
+        let zones = self.zones.read().await;
 
         let mut best_match = None;
         for zone in zones.zones() {
@@ -236,11 +226,11 @@ impl Authority {
         Some(packet)
     }
 
-    pub fn read(&self) -> LockResult<RwLockReadGuard<'_, Zones>> {
-        self.zones.read()
+    pub async fn read(&self) -> RwLockReadGuard<'_, Zones> {
+        self.zones.read().await
     }
 
-    pub fn write(&self) -> LockResult<RwLockWriteGuard<'_, Zones>> {
-        self.zones.write()
+    pub async fn write(&self) -> RwLockWriteGuard<'_, Zones> {
+        self.zones.write().await
     }
 }

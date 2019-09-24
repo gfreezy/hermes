@@ -1,8 +1,8 @@
 //! hermes documentation
 
 pub mod dns;
-pub mod web;
 
+use async_std::task;
 use std::env;
 use std::net::Ipv4Addr;
 use std::sync::Arc;
@@ -11,11 +11,7 @@ use getopts::Options;
 
 use crate::dns::context::{ResolveStrategy, ServerContext};
 use crate::dns::protocol::{DnsRecord, TransientTtl};
-use crate::dns::server::{DnsServer, DnsTcpServer, DnsUdpServer};
-use crate::web::authority::{AuthorityAction, ZoneAction};
-use crate::web::cache::CacheAction;
-use crate::web::index::IndexAction;
-use crate::web::server::WebServer;
+use crate::dns::server::DnsUdpServer;
 
 fn print_usage(program: &str, opts: Options) {
     let brief = format!("Usage: {} [options]", program);
@@ -50,77 +46,58 @@ fn main() {
         return;
     }
 
-    let mut context = Arc::new(ServerContext::new());
+    task::block_on(async {
+        let mut context = Arc::new(ServerContext::new().await);
 
-    if let Some(ctx) = Arc::get_mut(&mut context) {
-        let mut index_rootservers = true;
-        if opt_matches.opt_present("f") {
-            match opt_matches
-                .opt_str("f")
-                .and_then(|x| x.parse::<Ipv4Addr>().ok())
-            {
-                Some(ip) => {
-                    ctx.resolve_strategy = ResolveStrategy::Forward {
-                        host: ip.to_string(),
-                        port: 53,
-                    };
-                    index_rootservers = false;
-                    println!("Running as forwarder");
+        if let Some(ctx) = Arc::get_mut(&mut context) {
+            let mut index_rootservers = true;
+            if opt_matches.opt_present("f") {
+                match opt_matches
+                    .opt_str("f")
+                    .and_then(|x| x.parse::<Ipv4Addr>().ok())
+                {
+                    Some(ip) => {
+                        ctx.resolve_strategy = ResolveStrategy::Forward {
+                            host: ip.to_string(),
+                            port: 53,
+                        };
+                        index_rootservers = false;
+                        println!("Running as forwarder");
+                    }
+                    None => {
+                        println!("Forward parameter must be a valid Ipv4 address");
+                        return;
+                    }
                 }
-                None => {
-                    println!("Forward parameter must be a valid Ipv4 address");
+            }
+
+            if opt_matches.opt_present("a") {
+                ctx.allow_recursive = false;
+            }
+
+            match ctx.initialize().await {
+                Ok(_) => {}
+                Err(e) => {
+                    println!("Server failed to initialize: {:?}", e);
                     return;
                 }
             }
-        }
 
-        if opt_matches.opt_present("a") {
-            ctx.allow_recursive = false;
-        }
-
-        match ctx.initialize() {
-            Ok(_) => {}
-            Err(e) => {
-                println!("Server failed to initialize: {:?}", e);
-                return;
+            if index_rootservers {
+                let _ = ctx.cache.store(&get_rootservers());
             }
         }
 
-        if index_rootservers {
-            let _ = ctx.cache.store(&get_rootservers());
+        let port = 53;
+
+        println!("Listening on port {}", port);
+
+        // Start DNS servers
+        if context.enable_udp {
+            let udp_server = DnsUdpServer::new(context.clone());
+            udp_server.run_server().await
         }
-    }
-
-    let port = 53;
-
-    println!("Listening on port {}", port);
-
-    // Start DNS servers
-    if context.enable_udp {
-        let udp_server = DnsUdpServer::new(context.clone(), 20);
-        if let Err(e) = udp_server.run_server() {
-            println!("Failed to bind UDP listener: {:?}", e);
-        }
-    }
-
-    if context.enable_tcp {
-        let tcp_server = DnsTcpServer::new(context.clone(), 20);
-        if let Err(e) = tcp_server.run_server() {
-            println!("Failed to bind TCP listener: {:?}", e);
-        }
-    }
-
-    // Start web server
-    if context.enable_api {
-        let mut webserver = WebServer::new(context.clone());
-
-        webserver.register_action(Box::new(CacheAction::new(context.clone())));
-        webserver.register_action(Box::new(AuthorityAction::new(context.clone())));
-        webserver.register_action(Box::new(ZoneAction::new(context.clone())));
-        webserver.register_action(Box::new(IndexAction::new(context.clone())));
-
-        webserver.run_webserver();
-    }
+    })
 }
 
 fn get_rootservers() -> Vec<DnsRecord> {

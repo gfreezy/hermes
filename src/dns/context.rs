@@ -34,34 +34,28 @@ pub struct ServerContext {
     pub cache: SynchronizedCache,
     pub client: Box<dyn DnsClient + Sync + Send>,
     pub dns_port: u16,
-    pub api_port: u16,
     pub resolve_strategy: ResolveStrategy,
     pub allow_recursive: bool,
     pub enable_udp: bool,
-    pub enable_tcp: bool,
-    pub enable_api: bool,
     pub statistics: ServerStatistics,
 }
-
-impl Default for ServerContext {
-    fn default() -> Self {
-        ServerContext::new()
-    }
-}
+//
+//impl Default for ServerContext {
+//    fn default() -> Self {
+//        ServerContext::new()
+//    }
+//}
 
 impl ServerContext {
-    pub fn new() -> ServerContext {
+    pub async fn new() -> ServerContext {
         ServerContext {
             authority: Authority::new(),
             cache: SynchronizedCache::new(),
-            client: Box::new(DnsNetworkClient::new(34255)),
+            client: Box::new(DnsNetworkClient::new(34255).await),
             dns_port: 53,
-            api_port: 5380,
             resolve_strategy: ResolveStrategy::Recursive,
             allow_recursive: true,
             enable_udp: true,
-            enable_tcp: true,
-            enable_api: true,
             statistics: ServerStatistics {
                 tcp_query_count: AtomicUsize::new(0),
                 udp_query_count: AtomicUsize::new(0),
@@ -69,12 +63,9 @@ impl ServerContext {
         }
     }
 
-    pub fn initialize(&mut self) -> Result<()> {
-        // Start UDP client thread
-        self.client.run()?;
-
+    pub async fn initialize(&mut self) -> Result<()> {
         // Load authority data
-        self.authority.load()?;
+        self.authority.load().await?;
 
         Ok(())
     }
@@ -108,17 +99,13 @@ pub mod tests {
             cache: SynchronizedCache::new(),
             client: Box::new(DnsStubClient::new(callback)),
             dns_port: 53,
-            api_port: 5380,
             resolve_strategy: ResolveStrategy::Recursive,
             allow_recursive: true,
             enable_udp: true,
-            enable_tcp: true,
-            enable_api: true,
             statistics: ServerStatistics {
                 tcp_query_count: AtomicUsize::new(0),
                 udp_query_count: AtomicUsize::new(0),
             },
         })
     }
-
 }
