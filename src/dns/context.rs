@@ -36,7 +36,6 @@ pub struct ServerContext {
     pub dns_port: u16,
     pub resolve_strategy: ResolveStrategy,
     pub allow_recursive: bool,
-    pub enable_udp: bool,
     pub statistics: ServerStatistics,
 }
 //
@@ -55,7 +54,6 @@ impl ServerContext {
             dns_port: 53,
             resolve_strategy: ResolveStrategy::Recursive,
             allow_recursive: true,
-            enable_udp: true,
             statistics: ServerStatistics {
                 tcp_query_count: AtomicUsize::new(0),
                 udp_query_count: AtomicUsize::new(0),

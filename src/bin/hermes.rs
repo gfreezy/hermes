@@ -89,10 +89,8 @@ fn main() {
         println!("Listening on port {}", port);
 
         // Start DNS servers
-        if context.enable_udp {
-            let udp_server = DnsUdpServer::new(context.clone());
-            udp_server.run_server().await
-        }
+        let udp_server = DnsUdpServer::new(context.clone());
+        udp_server.run_server().await
     })
 }
 

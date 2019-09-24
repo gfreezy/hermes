@@ -2,6 +2,6 @@
 
 pub mod dns;
 
-pub use crate::dns::context::{ResolveStrategy, ServerContext};
-pub use crate::dns::protocol::{DnsRecord, TransientTtl};
-pub use crate::dns::server::DnsUdpServer;
+pub use dns::context::{ResolveStrategy, ServerContext};
+pub use dns::protocol::{DnsRecord, TransientTtl};
+pub use dns::server::DnsUdpServer;
