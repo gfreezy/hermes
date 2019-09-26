@@ -158,7 +158,7 @@ impl DomainEntry {
             None => return,
         };
 
-        if let RecordSet::Records { ref records, .. } = *current_set {
+        if let RecordSet::Records { records, .. } = current_set {
             for entry in records {
                 let ttl_offset = Duration::seconds(entry.record.get_ttl() as i64);
                 let expires = entry.timestamp + ttl_offset;
