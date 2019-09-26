@@ -58,7 +58,13 @@ impl<'a> Zones {
     }
 
     pub fn load(&mut self) -> Result<()> {
-        let zones_dir = Path::new("zones").read_dir()?;
+        let zones_dir = match Path::new("zones").read_dir() {
+            Ok(dir) => dir,
+            Err(e) => {
+                eprintln!("{}", e);
+                return Ok(());
+            }
+        };
 
         for wrapped_filename in zones_dir {
             let filename = match wrapped_filename {
