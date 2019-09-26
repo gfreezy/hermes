@@ -156,7 +156,8 @@ pub struct DnsUdpServer {
 }
 
 impl DnsUdpServer {
-    pub fn new(context: Arc<ServerContext>) -> DnsUdpServer {
+    pub async fn new(resolver: Box<dyn DnsResolver + Send + Sync>) -> DnsUdpServer {
+        let context = Arc::new(ServerContext::new(resolver).await);
         DnsUdpServer { context }
     }
 

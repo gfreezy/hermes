@@ -3,13 +3,12 @@
 use async_std::task;
 use std::env;
 use std::net::Ipv4Addr;
-use std::sync::Arc;
 
 use getopts::Options;
 
 use hermesdns::DnsNetworkClient;
 use hermesdns::ForwardingDnsResolver;
-use hermesdns::{DnsUdpServer, ServerContext};
+use hermesdns::{DnsUdpServer};
 
 fn print_usage(program: &str, opts: Options) {
     let brief = format!("Usage: {} [options]", program);
@@ -63,24 +62,20 @@ fn main() {
     let allow_recursive = !opt_matches.opt_present("a");
 
     task::block_on(async {
-        let context = Arc::new(
-            ServerContext::new(Box::new(
-                ForwardingDnsResolver::new(
-                    (dns_host, 53),
-                    allow_recursive,
-                    Box::new(DnsNetworkClient::new(0).await),
-                )
+        let resolver = Box::new(
+            ForwardingDnsResolver::new(
+                (dns_host, 53),
+                allow_recursive,
+                Box::new(DnsNetworkClient::new(0).await),
+            )
                 .await,
-            ))
-            .await,
         );
-
         let port = 53;
 
         println!("Listening on port {}", port);
 
         // Start DNS servers
-        let udp_server = DnsUdpServer::new(context.clone());
+        let udp_server = DnsUdpServer::new(resolver).await;
         udp_server.run_server().await
     })
 }
