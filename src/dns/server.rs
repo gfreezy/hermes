@@ -6,8 +6,6 @@ use crate::dns::protocol::{DnsPacket, DnsRecord, QueryType, ResultCode};
 use crate::dns::resolve::DnsResolver;
 use async_std::net::UdpSocket;
 use async_std::task::spawn;
-use futures::future::{BoxFuture, FutureExt};
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 macro_rules! return_or_report {
@@ -37,31 +35,43 @@ macro_rules! ignore_or_report {
 /// Utility function for resolving domains referenced in for example CNAME or SRV
 /// records. This usually spares the client from having to perform additional
 /// lookups.
-fn resolve_cnames<'a>(
+async fn resolve_cnames<'a>(
     lookup_list: &'a [DnsRecord],
     results: &'a mut Vec<DnsPacket>,
-    resolver: &'a mut dyn DnsResolver,
+    resolver: &'a (dyn DnsResolver + Send + Sync),
     depth: u16,
-) -> BoxFuture<'a, ()> {
-    async move {
-        if depth > 10 {
-            return;
-        }
-        for rec in lookup_list {
-            match rec {
-                DnsRecord::CNAME { host, .. } | DnsRecord::SRV { host, .. } => {
-                    if let Ok(result2) = resolver.resolve(host, QueryType::A, true).await {
-                        let new_unmatched = result2.get_unresolved_cnames();
-                        results.push(result2);
+) {
+    let mut unmatched: Vec<_> = lookup_list
+        .iter()
+        .map(|rec| (rec.clone(), depth + 1))
+        .collect();
 
-                        resolve_cnames(&new_unmatched, results, resolver, depth + 1).await
+    loop {
+        if unmatched.is_empty() {
+            break;
+        }
+
+        let mut new_unmatched = vec![];
+        for (rec, depth) in unmatched {
+            if depth <= 10 {
+                match rec {
+                    DnsRecord::CNAME { ref host, .. } | DnsRecord::SRV { ref host, .. } => {
+                        if let Ok(result2) = resolver.resolve(host, QueryType::A, true).await {
+                            new_unmatched.extend(
+                                result2
+                                    .get_unresolved_cnames()
+                                    .into_iter()
+                                    .map(|rec| (rec, depth + 1)),
+                            );
+                            results.push(result2);
+                        }
                     }
+                    _ => {}
                 }
-                _ => {}
             }
         }
+        unmatched = new_unmatched;
     }
-        .boxed()
 }
 
 /// Perform the actual work for a query
@@ -74,12 +84,13 @@ fn resolve_cnames<'a>(
 /// This function will always return a valid packet, even if the request could not
 /// be performed, since we still want to send something back to the client.
 pub async fn execute_query(context: Arc<ServerContext>, request: &DnsPacket) -> DnsPacket {
+    let allow_recursive = context.allow_recursive;
     let mut packet = DnsPacket::new();
     packet.header.id = request.header.id;
-    packet.header.recursion_available = context.allow_recursive;
+    packet.header.recursion_available = allow_recursive;
     packet.header.response = true;
 
-    if request.header.recursion_desired && !context.allow_recursive {
+    if request.header.recursion_desired && !allow_recursive {
         packet.header.rescode = ResultCode::REFUSED;
     } else if request.questions.is_empty() {
         packet.header.rescode = ResultCode::FORMERR;
@@ -89,7 +100,7 @@ pub async fn execute_query(context: Arc<ServerContext>, request: &DnsPacket) -> 
         let question = &request.questions[0];
         packet.questions.push(question.clone());
 
-        let mut resolver = context.create_resolver(context.clone());
+        let resolver = context.resolver.as_ref();
         let rescode = match resolver
             .resolve(
                 &question.name,
@@ -104,7 +115,7 @@ pub async fn execute_query(context: Arc<ServerContext>, request: &DnsPacket) -> 
                 let unmatched = result.get_unresolved_cnames();
                 results.push(result);
 
-                resolve_cnames(&unmatched, &mut results, resolver.as_mut(), 0);
+                resolve_cnames(&unmatched, &mut results, resolver, 0).await;
 
                 rescode
             }
@@ -162,12 +173,6 @@ impl DnsUdpServer {
         );
 
         loop {
-            let _ = self
-                .context
-                .statistics
-                .udp_query_count
-                .fetch_add(1, Ordering::Release);
-
             // Read a query packet
             let mut req_buffer = BytePacketBuffer::new();
             let (_, src) = match socket.recv_from(&mut req_buffer.buf).await {
@@ -198,6 +203,7 @@ impl DnsUdpServer {
 
             let context = self.context.clone();
             let socket_clone = socket.clone();
+
             spawn(async move {
                 // Create a response buffer, and ask the context for an appropriate
                 // resolver
@@ -233,7 +239,7 @@ mod tests {
     use super::*;
 
     use crate::dns::context::tests::create_test_context;
-    use crate::dns::context::ResolveStrategy;
+    use crate::ResolveStrategy;
     use futures::executor::block_on;
 
     fn build_query(qname: &str, qtype: QueryType) -> DnsPacket {
@@ -251,54 +257,51 @@ mod tests {
     fn test_execute_query() {
         block_on(async {
             // Construct a context to execute some queries successfully
-            let mut context = create_test_context(Box::new(|qname, qtype, _, _| {
-                let mut packet = DnsPacket::new();
+            let mut context = create_test_context(
+                Box::new(|qname, qtype, _, _| {
+                    let mut packet = DnsPacket::new();
 
-                if qname == "google.com" {
-                    packet.answers.push(DnsRecord::A {
-                        domain: "google.com".to_string(),
-                        addr: "127.0.0.1".parse::<Ipv4Addr>().unwrap(),
-                        ttl: TransientTtl(3600),
-                    });
-                } else if qname == "www.facebook.com" && qtype == QueryType::CNAME {
-                    packet.answers.push(DnsRecord::CNAME {
-                        domain: "www.facebook.com".to_string(),
-                        host: "cdn.facebook.com".to_string(),
-                        ttl: TransientTtl(3600),
-                    });
-                    packet.answers.push(DnsRecord::A {
-                        domain: "cdn.facebook.com".to_string(),
-                        addr: "127.0.0.1".parse::<Ipv4Addr>().unwrap(),
-                        ttl: TransientTtl(3600),
-                    });
-                } else if qname == "www.microsoft.com" && qtype == QueryType::CNAME {
-                    packet.answers.push(DnsRecord::CNAME {
-                        domain: "www.microsoft.com".to_string(),
-                        host: "cdn.microsoft.com".to_string(),
-                        ttl: TransientTtl(3600),
-                    });
-                } else if qname == "cdn.microsoft.com" && qtype == QueryType::A {
-                    packet.answers.push(DnsRecord::A {
-                        domain: "cdn.microsoft.com".to_string(),
-                        addr: "127.0.0.1".parse::<Ipv4Addr>().unwrap(),
-                        ttl: TransientTtl(3600),
-                    });
-                } else {
-                    packet.header.rescode = ResultCode::NXDOMAIN;
-                }
+                    if qname == "google.com" {
+                        packet.answers.push(DnsRecord::A {
+                            domain: "google.com".to_string(),
+                            addr: "127.0.0.1".parse::<Ipv4Addr>().unwrap(),
+                            ttl: TransientTtl(3600),
+                        });
+                    } else if qname == "www.facebook.com" && qtype == QueryType::CNAME {
+                        packet.answers.push(DnsRecord::CNAME {
+                            domain: "www.facebook.com".to_string(),
+                            host: "cdn.facebook.com".to_string(),
+                            ttl: TransientTtl(3600),
+                        });
+                        packet.answers.push(DnsRecord::A {
+                            domain: "cdn.facebook.com".to_string(),
+                            addr: "127.0.0.1".parse::<Ipv4Addr>().unwrap(),
+                            ttl: TransientTtl(3600),
+                        });
+                    } else if qname == "www.microsoft.com" && qtype == QueryType::CNAME {
+                        packet.answers.push(DnsRecord::CNAME {
+                            domain: "www.microsoft.com".to_string(),
+                            host: "cdn.microsoft.com".to_string(),
+                            ttl: TransientTtl(3600),
+                        });
+                    } else if qname == "cdn.microsoft.com" && qtype == QueryType::A {
+                        packet.answers.push(DnsRecord::A {
+                            domain: "cdn.microsoft.com".to_string(),
+                            addr: "127.0.0.1".parse::<Ipv4Addr>().unwrap(),
+                            ttl: TransientTtl(3600),
+                        });
+                    } else {
+                        packet.header.rescode = ResultCode::NXDOMAIN;
+                    }
 
-                Ok(packet)
-            }));
-
-            match Arc::get_mut(&mut context) {
-                Some(mut ctx) => {
-                    ctx.resolve_strategy = ResolveStrategy::Forward {
-                        host: "127.0.0.1".to_string(),
-                        port: 53,
-                    };
-                }
-                None => panic!(),
-            }
+                    Ok(packet)
+                }),
+                ResolveStrategy::Forward {
+                    host: "114.114.114.114".to_string(),
+                    port: 53,
+                },
+            )
+            .await;
 
             // A successful resolve
             {
@@ -345,7 +348,7 @@ mod tests {
                     &build_query("www.microsoft.com", QueryType::CNAME),
                 )
                 .await;
-                assert_eq!(1, res.answers.len());
+                assert_eq!(2, res.answers.len());
 
                 match res.answers[0] {
                     DnsRecord::CNAME { ref domain, .. } => {
@@ -389,19 +392,12 @@ mod tests {
             };
 
             // Now construct a context where the dns client will return a failure
-            let mut context2 = create_test_context(Box::new(|_, _, _, _| {
-                Err(Error::new(ErrorKind::NotFound, "Fail"))
-            }));
+            let context2 = create_test_context(
+                Box::new(|_, _, _, _| Err(Error::new(ErrorKind::NotFound, "Fail"))),
+                ResolveStrategy::Recursive,
+            )
+            .await;
 
-            match Arc::get_mut(&mut context2) {
-                Some(mut ctx) => {
-                    ctx.resolve_strategy = ResolveStrategy::Forward {
-                        host: "127.0.0.1".to_string(),
-                        port: 53,
-                    };
-                }
-                None => panic!(),
-            }
 
             // We expect this to set the server failure rescode
             {

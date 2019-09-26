@@ -209,7 +209,7 @@ impl Cache {
         }
     }
 
-    pub fn lookup(&mut self, qname: &str, qtype: QueryType) -> Option<DnsPacket> {
+    fn lookup(&mut self, qname: &str, qtype: QueryType) -> Option<DnsPacket> {
         match self.get_cache_state(qname, qtype) {
             CacheState::PositiveCache => {
                 let mut qr = DnsPacket::new();
@@ -228,7 +228,7 @@ impl Cache {
         }
     }
 
-    pub fn store(&mut self, records: &[DnsRecord]) {
+    fn store(&mut self, records: &[DnsRecord]) {
         for rec in records {
             let domain = match rec.get_domain() {
                 Some(x) => x,
@@ -246,7 +246,7 @@ impl Cache {
         }
     }
 
-    pub fn store_nxdomain(&mut self, qname: &str, qtype: QueryType, ttl: u32) {
+    fn store_nxdomain(&mut self, qname: &str, qtype: QueryType, ttl: u32) {
         if let Some(ref mut rs) = self.domain_entries.get_mut(qname).and_then(Arc::get_mut) {
             rs.store_nxdomain(qtype, ttl);
             return;

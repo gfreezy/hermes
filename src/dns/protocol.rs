@@ -883,9 +883,9 @@ impl DnsPacket {
         let mut unresolved = Vec::new();
         for answer in &self.answers {
             let mut matched = false;
-            if let DnsRecord::CNAME { ref host, .. } = *answer {
+            if let DnsRecord::CNAME { host, .. } = answer {
                 for answer2 in &self.answers {
-                    if let DnsRecord::A { ref domain, .. } = *answer2 {
+                    if let DnsRecord::A { domain, .. } = answer2 {
                         if domain == host {
                             matched = true;
                             break;
