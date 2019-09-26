@@ -7,8 +7,8 @@ use std::net::Ipv4Addr;
 use getopts::Options;
 
 use hermesdns::DnsNetworkClient;
+use hermesdns::DnsUdpServer;
 use hermesdns::ForwardingDnsResolver;
-use hermesdns::{DnsUdpServer};
 
 fn print_usage(program: &str, opts: Options) {
     let brief = format!("Usage: {} [options]", program);
@@ -68,7 +68,7 @@ fn main() {
                 allow_recursive,
                 Box::new(DnsNetworkClient::new(0).await),
             )
-                .await,
+            .await,
         );
         let port = 53;
 
