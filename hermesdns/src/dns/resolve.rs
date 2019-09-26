@@ -103,6 +103,7 @@ pub struct RecursiveDnsResolver {
     cache: SynchronizedCache,
     dns_client: Box<dyn DnsClient + Send + Sync>,
     allow_recursive: bool,
+    authority: Authority,
 }
 
 impl RecursiveDnsResolver {
@@ -115,6 +116,7 @@ impl RecursiveDnsResolver {
         RecursiveDnsResolver {
             cache: SynchronizedCache::new(),
             dns_client,
+            authority,
             allow_recursive,
         }
     }

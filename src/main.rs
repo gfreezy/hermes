@@ -7,9 +7,9 @@ use std::sync::Arc;
 
 use getopts::Options;
 
-use hermes::dns::client::DnsNetworkClient;
-use hermes::dns::resolve::ForwardingDnsResolver;
-use hermes::{DnsUdpServer, ServerContext};
+use hermesdns::DnsNetworkClient;
+use hermesdns::ForwardingDnsResolver;
+use hermesdns::{DnsUdpServer, ServerContext};
 
 fn print_usage(program: &str, opts: Options) {
     let brief = format!("Usage: {} [options]", program);
