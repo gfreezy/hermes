@@ -1,12 +1,11 @@
 //! a threadsafe cache for DNS information
 
+use chrono::{DateTime, Duration, Local};
 use std::clone::Clone;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::io::{Error, ErrorKind, Result};
 use std::sync::{Arc, RwLock};
-
-use chrono::*;
 
 use crate::dns::protocol::{DnsPacket, DnsRecord, QueryType, ResultCode};
 

@@ -398,7 +398,6 @@ mod tests {
             )
             .await;
 
-
             // We expect this to set the server failure rescode
             {
                 let res =
