@@ -1,5 +1,5 @@
 //! contains the data store for local zones
-
+#![allow(dead_code)]
 use crate::dns::buffer::{PacketBuffer, StreamPacketBuffer, VectorPacketBuffer};
 use crate::dns::protocol::{DnsPacket, DnsRecord, QueryType, ResultCode, TransientTtl};
 use async_std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
