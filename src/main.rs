@@ -70,12 +70,12 @@ fn main() {
             )
             .await,
         );
-        let port = 53;
+        let port = 53usize;
 
         println!("Listening on port {}", port);
 
         // Start DNS servers
-        let udp_server = DnsUdpServer::new(resolver).await;
+        let udp_server = DnsUdpServer::new(0, resolver).await;
         udp_server.run_server().await
     })
 }
