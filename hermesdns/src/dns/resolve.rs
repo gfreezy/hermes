@@ -13,11 +13,7 @@ use crate::dns::protocol::{DnsPacket, QueryType, ResultCode};
 
 #[async_trait]
 pub trait DnsResolver {
-    fn cache(&self) -> &SynchronizedCache;
-    fn allow_recursive(&self) -> bool;
-
     async fn resolve(&self, qname: &str, qtype: QueryType, recursive: bool) -> Result<DnsPacket>;
-    async fn perform(&self, qname: &str, qtype: QueryType) -> Result<DnsPacket>;
 }
 
 /// A Forwarding DNS Resolver
@@ -47,14 +43,6 @@ impl ForwardingDnsResolver {
 
 #[async_trait]
 impl DnsResolver for ForwardingDnsResolver {
-    fn cache(&self) -> &SynchronizedCache {
-        &self.cache
-    }
-
-    fn allow_recursive(&self) -> bool {
-        self.allow_recursive
-    }
-
     async fn resolve(&self, qname: &str, qtype: QueryType, recursive: bool) -> Result<DnsPacket> {
         if let QueryType::UNKNOWN(_) = qtype {
             let mut packet = DnsPacket::new();
@@ -62,26 +50,21 @@ impl DnsResolver for ForwardingDnsResolver {
             return Ok(packet);
         }
 
-        if !recursive || !self.allow_recursive() {
+        if !recursive || !self.allow_recursive {
             let mut packet = DnsPacket::new();
             packet.header.rescode = ResultCode::REFUSED;
             return Ok(packet);
         }
 
-        if let Some(qr) = self.cache().lookup(qname, qtype) {
+        if let Some(qr) = self.cache.lookup(qname, qtype) {
             return Ok(qr);
         }
 
         if qtype == QueryType::A || qtype == QueryType::AAAA {
-            if let Some(qr) = self.cache().lookup(qname, QueryType::CNAME) {
+            if let Some(qr) = self.cache.lookup(qname, QueryType::CNAME) {
                 return Ok(qr);
             }
         }
-
-        self.perform(qname, qtype).await
-    }
-
-    async fn perform(&self, qname: &str, qtype: QueryType) -> Result<DnsPacket> {
         let &(ref host, port) = &self.server;
         let result = self
             .dns_client
@@ -120,43 +103,6 @@ impl RecursiveDnsResolver {
             authority,
             allow_recursive,
         }
-    }
-}
-
-#[async_trait]
-impl DnsResolver for RecursiveDnsResolver {
-    fn cache(&self) -> &SynchronizedCache {
-        &self.cache
-    }
-
-    fn allow_recursive(&self) -> bool {
-        self.allow_recursive
-    }
-
-    async fn resolve(&self, qname: &str, qtype: QueryType, recursive: bool) -> Result<DnsPacket> {
-        if let QueryType::UNKNOWN(_) = qtype {
-            let mut packet = DnsPacket::new();
-            packet.header.rescode = ResultCode::NOTIMP;
-            return Ok(packet);
-        }
-
-        if !recursive || !self.allow_recursive() {
-            let mut packet = DnsPacket::new();
-            packet.header.rescode = ResultCode::REFUSED;
-            return Ok(packet);
-        }
-
-        if let Some(qr) = self.cache().lookup(qname, qtype) {
-            return Ok(qr);
-        }
-
-        if qtype == QueryType::A || qtype == QueryType::AAAA {
-            if let Some(qr) = self.cache().lookup(qname, QueryType::CNAME) {
-                return Ok(qr);
-            }
-        }
-
-        self.perform(qname, qtype).await
     }
 
     async fn perform(&self, qname: &str, qtype: QueryType) -> Result<DnsPacket> {
@@ -247,6 +193,35 @@ impl DnsResolver for RecursiveDnsResolver {
     }
 }
 
+#[async_trait]
+impl DnsResolver for RecursiveDnsResolver {
+    async fn resolve(&self, qname: &str, qtype: QueryType, recursive: bool) -> Result<DnsPacket> {
+        if let QueryType::UNKNOWN(_) = qtype {
+            let mut packet = DnsPacket::new();
+            packet.header.rescode = ResultCode::NOTIMP;
+            return Ok(packet);
+        }
+
+        if !recursive || !self.allow_recursive {
+            let mut packet = DnsPacket::new();
+            packet.header.rescode = ResultCode::REFUSED;
+            return Ok(packet);
+        }
+
+        if let Some(qr) = self.cache.lookup(qname, qtype) {
+            return Ok(qr);
+        }
+
+        if qtype == QueryType::A || qtype == QueryType::AAAA {
+            if let Some(qr) = self.cache.lookup(qname, QueryType::CNAME) {
+                return Ok(qr);
+            }
+        }
+
+        self.perform(qname, qtype).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -313,7 +288,7 @@ mod tests {
 
                 assert_eq!(1, res.answers.len());
 
-                let list = match context.resolver.cache().list() {
+                let list = match context.resolver.cache.list() {
                     Ok(x) => x,
                     Err(_) => panic!(),
                 };
@@ -388,7 +363,7 @@ mod tests {
                 ttl: TransientTtl(3600),
             });
 
-            let _ = context.resolver.cache().store(&nameservers);
+            let _ = context.resolver.cache.store(&nameservers);
 
             if let Ok(_) = resolver.resolve("google.com", QueryType::A, true).await {
                 panic!();
@@ -464,7 +439,7 @@ mod tests {
                     ttl: TransientTtl(3600),
                 });
 
-                let _ = context.resolver.cache().store(&nameservers);
+                let _ = context.resolver.cache.store(&nameservers);
             }
 
             match resolver.resolve("google.com", QueryType::A, true).await {
@@ -488,7 +463,7 @@ mod tests {
                     ttl: TransientTtl(3600),
                 });
 
-                let _ = context.resolver.cache().store(&nameservers);
+                let _ = context.resolver.cache.store(&nameservers);
             }
 
             match resolver.resolve("google.com", QueryType::A, true).await {
@@ -512,7 +487,7 @@ mod tests {
                     ttl: TransientTtl(3600),
                 });
 
-                let _ = context.resolver.cache().store(&nameservers);
+                let _ = context.resolver.cache.store(&nameservers);
             }
 
             match resolver.resolve("google.com", QueryType::A, true).await {
@@ -574,7 +549,7 @@ mod tests {
                 ttl: TransientTtl(3600),
             });
 
-            let _ = context.resolver.cache().store(&nameservers);
+            let _ = context.resolver.cache.store(&nameservers);
 
             // Check that we can successfully resolve
             {
@@ -619,7 +594,7 @@ mod tests {
 
             // Now check that the cache is used, and that the statistics is correct
             {
-                let list = match context.resolver.cache().list() {
+                let list = match context.resolver.cache.list() {
                     Ok(x) => x,
                     Err(_) => panic!(),
                 };

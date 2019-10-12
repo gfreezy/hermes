@@ -14,9 +14,9 @@ pub struct ServerContext {
 }
 
 impl ServerContext {
-    pub async fn new(resolver: Box<dyn DnsResolver + Send + Sync>) -> ServerContext {
+    pub async fn new(port: u16, resolver: Box<dyn DnsResolver + Send + Sync>) -> ServerContext {
         ServerContext {
-            dns_port: 53,
+            dns_port: port,
             resolver,
             allow_recursive: true,
         }

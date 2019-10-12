@@ -156,9 +156,13 @@ pub struct DnsUdpServer {
 }
 
 impl DnsUdpServer {
-    pub async fn new(resolver: Box<dyn DnsResolver + Send + Sync>) -> DnsUdpServer {
-        let context = Arc::new(ServerContext::new(resolver).await);
+    pub async fn new(port: u16, resolver: Box<dyn DnsResolver + Send + Sync>) -> DnsUdpServer {
+        let context = Arc::new(ServerContext::new(port, resolver).await);
         DnsUdpServer { context }
+    }
+
+    pub fn context(&self) -> Arc<ServerContext> {
+        self.context.clone()
     }
 
     /// Launch the server

@@ -94,7 +94,8 @@ impl DnsNetworkClient {
             .await?;
         // Read data into a buffer
         let mut res_buffer = BytePacketBuffer::new();
-        self.socket.recv_from(&mut res_buffer.buf).await?;
+        let (size, _src) = self.socket.recv_from(&mut res_buffer.buf).await?;
+        assert!(res_buffer.buf.len() > size);
 
         // Construct a DnsPacket from buffer, skipping the packet if parsing
         // failed

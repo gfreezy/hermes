@@ -9,6 +9,6 @@ edition = "2018"
 [dependencies]
 rand = "0.7.2"
 chrono = "0.4.9"
-async-std = "0.99.6"
+async-std = "0.99"
 async-trait = "0.1.13"
-futures-preview = "0.3.0-alpha.18"
+futures-preview = "0.3.0-alpha"

@@ -269,6 +269,7 @@ impl SynchronizedCache {
         }
     }
 
+    #[allow(dead_code)]
     pub fn list(&self) -> Result<Vec<Arc<DomainEntry>>> {
         let cache = match self.cache.read() {
             Ok(x) => x,
