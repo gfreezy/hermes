@@ -156,8 +156,8 @@ pub struct DnsUdpServer {
 }
 
 impl DnsUdpServer {
-    pub async fn new(port: u16, resolver: Box<dyn DnsResolver + Send + Sync>) -> DnsUdpServer {
-        let context = Arc::new(ServerContext::new(port, resolver).await);
+    pub async fn new(listen: String, resolver: Box<dyn DnsResolver + Send + Sync>) -> DnsUdpServer {
+        let context = Arc::new(ServerContext::new(listen, resolver).await);
         DnsUdpServer { context }
     }
 
@@ -172,7 +172,7 @@ impl DnsUdpServer {
     pub async fn run_server(self) {
         // Bind the socket
         let socket = Arc::new(
-            UdpSocket::bind(("0.0.0.0", self.context.dns_port))
+            UdpSocket::bind(&self.context.listen)
                 .await
                 .unwrap(),
         );

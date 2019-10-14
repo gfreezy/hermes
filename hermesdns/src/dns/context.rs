@@ -8,15 +8,15 @@ pub enum ResolveStrategy {
 }
 
 pub struct ServerContext {
-    pub dns_port: u16,
+    pub listen: String,
     pub resolver: Box<dyn DnsResolver + Send + Sync>,
     pub allow_recursive: bool,
 }
 
 impl ServerContext {
-    pub async fn new(port: u16, resolver: Box<dyn DnsResolver + Send + Sync>) -> ServerContext {
+    pub async fn new(listen: String, resolver: Box<dyn DnsResolver + Send + Sync>) -> ServerContext {
         ServerContext {
-            dns_port: port,
+            listen,
             resolver,
             allow_recursive: true,
         }
@@ -39,13 +39,14 @@ pub mod tests {
     ) -> Arc<ServerContext> {
         match resolve_strategy {
             ResolveStrategy::Recursive => Arc::new(
-                ServerContext::new(Box::new(
+                ServerContext::new("127.0.0.1:53".into(),
+                                   Box::new(
                     RecursiveDnsResolver::new(true, Box::new(DnsStubClient::new(callback))).await,
                 ))
                 .await,
             ),
             ResolveStrategy::Forward { host, port } => Arc::new(
-                ServerContext::new(Box::new(
+                ServerContext::new("127.0.0.1:53".into(), Box::new(
                     ForwardingDnsResolver::new(
                         (host, port),
                         true,
