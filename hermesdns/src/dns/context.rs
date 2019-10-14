@@ -14,7 +14,10 @@ pub struct ServerContext {
 }
 
 impl ServerContext {
-    pub async fn new(listen: String, resolver: Box<dyn DnsResolver + Send + Sync>) -> ServerContext {
+    pub async fn new(
+        listen: String,
+        resolver: Box<dyn DnsResolver + Send + Sync>,
+    ) -> ServerContext {
         ServerContext {
             listen,
             resolver,
@@ -39,21 +42,27 @@ pub mod tests {
     ) -> Arc<ServerContext> {
         match resolve_strategy {
             ResolveStrategy::Recursive => Arc::new(
-                ServerContext::new("127.0.0.1:53".into(),
-                                   Box::new(
-                    RecursiveDnsResolver::new(true, Box::new(DnsStubClient::new(callback))).await,
-                ))
+                ServerContext::new(
+                    "127.0.0.1:53".into(),
+                    Box::new(
+                        RecursiveDnsResolver::new(true, Box::new(DnsStubClient::new(callback)))
+                            .await,
+                    ),
+                )
                 .await,
             ),
             ResolveStrategy::Forward { host, port } => Arc::new(
-                ServerContext::new("127.0.0.1:53".into(), Box::new(
-                    ForwardingDnsResolver::new(
-                        (host, port),
-                        true,
-                        Box::new(DnsStubClient::new(callback)),
-                    )
-                    .await,
-                ))
+                ServerContext::new(
+                    "127.0.0.1:53".into(),
+                    Box::new(
+                        ForwardingDnsResolver::new(
+                            (host, port),
+                            true,
+                            Box::new(DnsStubClient::new(callback)),
+                        )
+                        .await,
+                    ),
+                )
                 .await,
             ),
         }

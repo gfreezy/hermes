@@ -171,11 +171,7 @@ impl DnsUdpServer {
     /// being called multiple times.
     pub async fn run_server(self) {
         // Bind the socket
-        let socket = Arc::new(
-            UdpSocket::bind(&self.context.listen)
-                .await
-                .unwrap(),
-        );
+        let socket = Arc::new(UdpSocket::bind(&self.context.listen).await.unwrap());
 
         loop {
             // Read a query packet
